@@ -1,0 +1,8 @@
+coverage
+mypy
+mypy-extensions
+lxml
+wheel
+pydocstyle
+pep8
+autopep8
