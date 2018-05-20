@@ -15,7 +15,9 @@ from .Traditional2Simplified_module import Converter
 import datetime
 import jieba
 from periodDetection.patterns import (
-    CHS_ARABIC_MAP, PATTERN, POS_AFFIX_DICT, UNIT_DICT, LEVEL_DICT
+    CHS_ARABIC_MAP, 
+    PATTERN, PATTERN2, 
+    POS_AFFIX_DICT, UNIT_DICT, LEVEL_DICT
 )
 from .LunarSolarConverter_module import LunarSolarConverter, Solar, Lunar
 
@@ -74,37 +76,119 @@ def chineseDigits2arabicWithin10000(chineseDigit, encoding="utf-8"):
         word_list[-1] = str(result)
     return ''.join(word_list)
 
+def inheritHighOrderTime(previous_time, level_int, date_dict):
+    '''
+    继承上次时间节点的高阶时间
+    比如本次时间最高单位为日,则继承上次的年和月
+
+    Args:
+        previous_time(datetime.datetime) :- 上次时间节点
+        level(int) :- 本次时间最高单位
+        date_dict(dict) :- 记录日期的字典
+    Returns:
+        commands(iterables) :- 要执行的语句
+    '''
+    date_dict = {}
+    LEVEL_DICT_INVERSE = {
+        "0" : "date_dict['year']  = {}".format(previous_time.year),
+        "-1" : "date_dict['month'] = {}".format( previous_time.month),
+        "-2" : "date_dict['day'] = {}".format(previous_time.day)
+    }
+    for i in range(level_int+1, 0 ):
+        exec( LEVEL_DICT_INVERSE[str(i)])
+
 def get_period(string_ori):
+    '''
+    用递归的方式来检测中文文本中包含的时间段
+
+    Args:
+        string_ori(str) :- 可能包含时间段的中文文本
+    '''
     string = chineseDigits2arabicWithin10000(string_ori)
+    print("原始句为 : {}\n转化中文数字后的句子为 : {}\n".format(
+        string_ori, string
+        )
+    )
+    date_dict =dict()
     match = re.search(pattern = PATTERN, string = string)
+    now = datetime.datetime.now()
+    start = now
+
     while match is not None:
         print('\n新的一轮:')
         # print('  pattern所在的字段 : ',string)
-        print('  pattern匹配到的字段 : ', colored(match.group(), 'green'))
+
         root = match.group('root')
         ordinal_root = match.group('ordinal_root')
         unit_root = match.group('unit_root')
         # print('unit_root : ', unit_root  )
-        pos_affix = match.group('pos_affix')
+        pos_affix_ori = match.group('pos_affix')
         unit_affix = match.group('unit_affix')
-        number_affix = match.group('number_affix')
+        number_affix_ori = match.group('number_affix')
+        number_special = match.group("number_special")
         [number_unit_root, unit_unit_root] = UNIT_DICT[unit_root] if unit_root else [0, '']
         # print('number_unit_root : ', number_unit_root)
         # print('unit_unit_root : ', unit_unit_root)
-        now = datetime.datetime.now()
         count_da  = ordinal_root.count('大') if ordinal_root else 0
         count_shang = ordinal_root.count('上') if ordinal_root else 0
         count_xia = ordinal_root.count('下') if ordinal_root else 0
 
+        if number_special is None:
+            print('  pattern匹配到的字段 : ', colored(match.group(), 'green'))
+        else :
+            print('  pattern匹配到的字段 : ', colored(re.search(pattern = PATTERN2, string = string).group(), 'green'))
+
+        ### 是否继承时间 ###
+        ############ start
+        for i in re.finditer(pattern = PATTERN, string = string):
+            start_index = i.start(0)
+            break
+        # 离得太远则不继承
+        if start_index > 10 :
+            print("离得太远,不继承了")
+            date_dict = {
+                'year' :  now.year,
+                'month' : now.month,
+                'day' : now.day
+            }
+            start = now
+        ############# end
+
+        # 改这里,root也能继承 level2inherit
         if root is not None :
             # print('匹配到root了 !')
+            level_root = LEVEL_DICT[unit_unit_root]
+            date_dict['level2inherit'] = level_root
+
             month = now.month
             year = now.year
             day = now.day
-            match_digit = re.search(pattern = r'\d+', string = ordinal_root)
             weekday = now.weekday()
+
+            # 继承之前高阶的时间,比如本次时间最高单位{level_root}为月,则继承之前的年
+            if 'level2inherit' in date_dict :
+                # print("继承上次时间", start)
+                date_dict.update(
+                    {
+                    "year" : start.year,
+                    "month" : start.month,
+                    "day" : start.day
+                    }
+                )
+                if level_root<0 :
+                    inheritHighOrderTime(start, level_int = level_root, date_dict = date_dict)
+                year = date_dict["year"]
+                month = date_dict['month']
+                day = date_dict['day']  
+                # print("root继承到的时间为", start)
+
+            match_digit = re.search(pattern = r'\d+', string = ordinal_root)
+
             # 年,整年,全年
             if unit_unit_root == 'month' and number_unit_root ==12:
+                year = now.year
+                month = now.year 
+                day = now.day 
                 if match_digit is not None:
                     year = int(match_digit.group())
                 elif '这'  in ordinal_root  or '本' in ordinal_root or '今' in ordinal_root:
@@ -163,54 +247,125 @@ def get_period(string_ori):
                     end = start + datetime.timedelta(days = 6)     
                 else :
                     print('周级别没匹配到')
-            level_root = LEVEL_DICT[unit_unit_root]
-            print('  root字段 : ',colored(root, 'yellow'))    
-            print('  root开始的日子 : ', colored(start.date(), 'yellow'))
-            print('  root结束的日子 : ', colored(end.date(), 'yellow')  ) 
- 
-        if not number_affix :
+            # print('  root字段 : ',colored(root, 'yellow'))    
+            # print('  root开始的日子 : ', colored(start.date(), 'yellow'))
+            # print('  root结束的日子 : ', colored(end.date(), 'yellow')  ) 
+            # print('  level_root : ', colored(level_root, 'yellow')  ) 
+        
+        # 没有数量词则默认为1
+        # 比如上周,表示上一周
+        if not number_affix_ori :
             number_affix =  1
         else :
-            number_affix = int(number_affix)
-        [number_unit_affix, unit_unit_affix] = UNIT_DICT[unit_affix] if unit_affix else [0,'']
+            number_affix = int(number_affix_ori)
+        [number_unit_affix, unit_unit_affix] = UNIT_DICT[unit_affix] 
+
+        if root is None:
+            # 之前已经有时间了
+            # 继承之前高阶的时间,比如本次时间最高单位{level_root}为月,则继承之前的年
+            if "level_affix" in locals() and date_dict.get("level2inherit", 0) < 0:
+                # print("继承上次时间", start)
+                date_dict.update( 
+                    {
+                        "year" : start.year,
+                        "month" : start.month,
+                        "day" : start.day
+                    }
+                )
+                inheritHighOrderTime(start, level_int = date_dict['level2inherit'], date_dict = date_dict)
+                start = datetime.datetime(year = date_dict["year"], month = date_dict['month'], day = date_dict['day']  )
+                # print("affix继承到的时间为", start)
+
 
         level_affix = LEVEL_DICT[unit_unit_affix]
 
+        # 没有表示相对位置的词则默认为第
+        # 比如今年三月,表示今年第三月
+        pos_affix = POS_AFFIX_DICT[pos_affix_ori] if pos_affix_ori else 'ordinal'
 
-        pos_affix = POS_AFFIX_DICT[pos_affix] if pos_affix else 'ordinal'
-        # print('number_affix : ', number_affix)
-        # print('pos_affix : ',pos_affix)
+        # print('number_affix_ori : ', number_affix_ori)
+        # print('pos_affix_ori : ',pos_affix_ori)
         # print('number_unit_affix : ', number_unit_affix)
         # print('unit_unit_affix : ', unit_unit_affix)
-        if pos_affix in ['first']:
+
+        '''affix只匹配到一个时间单位或者时间单位+数字
+
+        如果是(周|星期|礼拜)\d,且上次时间单位为周,则匹配
+
+        否则用英文单词来代替时间单位,继续匹配.避免
+        1.因为把时间单位词理解成第1个单位,比如因为缺省把"周"理解为第一周.
+        2.没有意义的时间如年
+        '''
+        if number_affix_ori is None and pos_affix_ori is None :
+            print("只匹配到一个时间单位或者时间单位+数字")
+            if unit_affix in ["星期","礼拜","周"] and number_special is not None and date_dict['level2inherit'] ==-2:
+                # print("匹配到周几")
+                start = decalageDuTemp(start, int(number_special) - start.weekday(), 'day' )
+                end = start
+            else :
+                string = re.sub(unit_affix, unit_unit_affix, string ,1)
+                print("没有意义的匹配\n  用{}取代{}\n".format(
+                    unit_unit_affix, unit_affix 
+                ))
+                match = re.search(pattern = PATTERN, string = string)
+                print('  剩下的字段 : ',string)
+                continue 
+
+        elif pos_affix in ['first']:
+            start = start
             end = decalageDuTemp(start, number_affix * number_unit_affix, unit_unit_affix ) - datetime.timedelta(days = 1)
         elif pos_affix in ['last']:
             start = decalageDuTemp(end,  -number_affix * number_unit_affix, unit_unit_affix)
+        # 第几
         else :
-            if level_affix < level_root :
-                if level_root == 0:
-                    start = datetime.datetime(start.year, 1, 1)
-                elif level_root == -1: 
-                    start = datetime.datetime(start.year, start.month, 1)
-                elif level_root == -2 :
-                    start = decalageDuTemp(start, 0 ,'week')
+            inheritHighOrderTime(start, level_int = level_affix, date_dict = date_dict)
+
+            if date_dict.get('level2inherit', 0) == 0:
+                start = datetime.datetime(start.year, 1, 1)
+                end = end
+            elif date_dict['level2inherit'] == -1: 
+                start = datetime.datetime(start.year, start.month, 1)
+            elif date_dict['level2inherit'] == -2 :
+                start = decalageDuTemp(start, 0 ,'week')
                 # elif unit_unit_affix == 'day' :
                 #     start = decalageDuTemp(start, 1 - start.day   , unit_unit_affix)
             start = decalageDuTemp(start, (number_affix-1) * number_unit_affix, unit_unit_affix )
             end = decalageDuTemp(start, number_unit_affix, unit_unit_affix ) - datetime.timedelta(days = 1)
-
-        for i in re.finditer(pattern = PATTERN, string = string):
-            end_index = i.end(0)
-            break
+        
+        # 选取截取的文字
+        if number_special is None:
+            for i in re.finditer(pattern = PATTERN, string = string):
+                end_index = i.end(0)
+                break
+        else :
+            for i in re.finditer(pattern = PATTERN2, string = string):
+                end_index = i.end(0)
+                break
         string = string.lstrip( string[:end_index])
         print('这轮匹配到的时间段 :')
         print('  start : ', colored(start.date(), 'red'))
         print('  end : ', colored(end.date(), 'red'))
-        print('  这轮的level_root和level_affix : {}和{}'.format(level_root, level_affix) )
+        # print('  这轮的level_root和level_affix : {}和{}'.format(level_root, level_affix) )
         match = re.search(pattern = PATTERN, string = string)
         print('  剩下的字段 : ',string)
+        date_dict['level2inherit'] = level_affix
+        date_dict['year'] = start.year 
+        date_dict['month'] = start.month
+        date_dict['day'] = start.day
+        # print(date_dict)
 
 def decalageDuTemp(base, number, unit_str):
+    '''
+    得到与基础时间节点相差给定时间差距的时间节点
+
+    Args:
+        base(datetime.dateime) :- 基础时间节点
+        number(int) :- 时间单位的数量
+        unit_str(str) :- 表示时间单位的字符,
+                        choices = {
+                            'month', 'week', 'day'
+                        }
+    '''
     if unit_str in ['month'] :
         base = base + relativedelta(months = number)
     elif unit_str in ['week'] :

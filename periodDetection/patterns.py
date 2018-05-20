@@ -18,7 +18,11 @@ CHS_ARABIC_MAP = {
 }
 
 PATTERN = \
-r'(?P<root>(?P<ordinal_root>[0-9去明前后大今本上下这个昨]+)(?P<unit_root>(?:年|全年|整年|一整年|半年|月|周|星期|礼拜|天|日)+))?份?度?年?的?最?(?P<pos_affix>(?:上|下|前|后|第|第|首|末))?(?P<number_affix>[0-9]+)?个?(?P<unit_affix>(?:年|全年|整年|一整年|半年|季度|月|周|星期|礼拜|天|日|号))'
+r'(?P<root>(?P<ordinal_root>[0-9去明前后大今本上下这个昨]+)(?P<unit_root>(?:年|全年|整年|一整年|半年|月|周|星期|礼拜|天|日)))?份?度?年?的?最?(?P<pos_affix>上|下|前|后|第|第|首|末)?(?P<number_affix>[0-9]+)?个?(?P<unit_affix>年|全年|整年|一整年|半年|季度|月|周|星期|礼拜|天|日|号)(?P<number_special>[0-9]+)?'
+
+PATTERN2 = \
+r'(?P<root>(?P<ordinal_root>[0-9去明前后大今本上下这个昨]+)(?P<unit_root>(?:年|全年|整年|一整年|半年|月|周|星期|礼拜|天|日)))?份?度?年?的?最?(?P<pos_affix>上|下|前|后|第|第|首|末)?(?P<number_affix>[0-9]+)?个?(?P<unit_affix>年|全年|整年|一整年|半年|季度|月|周|星期|礼拜|天|日|号)'
+
 
 POS_AFFIX_DICT ={
     '上' : 'first',
@@ -28,6 +32,9 @@ POS_AFFIX_DICT ={
     '首' : 'first',
     '末' : 'last' ,
     '第' : 'ordinal'
+    # '周' : 'special',
+    # '礼拜' : 'special',
+    # '星期' : 'special'
 } # 缺失则为第
 
 UNIT_DICT ={
