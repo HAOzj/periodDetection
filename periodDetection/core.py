@@ -133,7 +133,7 @@ def get_period(string_ori):
         count_shang = ordinal_root.count('上') if ordinal_root else 0
         count_xia = ordinal_root.count('下') if ordinal_root else 0
 
-        if number_special is None:
+        if unit_affix in ["星期","礼拜","周"] and number_special is not None :
             print('  pattern匹配到的字段 : ', colored(match.group(), 'green'))
         else :
             print('  pattern匹配到的字段 : ', colored(re.search(pattern = PATTERN2, string = string).group(), 'green'))
@@ -333,7 +333,7 @@ def get_period(string_ori):
             end = decalageDuTemp(start, number_unit_affix, unit_unit_affix ) - datetime.timedelta(days = 1)
         
         # 选取截取的文字
-        if number_special is None:
+        if unit_affix in ["星期","礼拜","周"] and number_special is not None:
             for i in re.finditer(pattern = PATTERN, string = string):
                 end_index = i.end(0)
                 break
