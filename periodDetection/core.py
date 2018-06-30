@@ -76,6 +76,28 @@ def chineseDigits2arabicWithin10000(chineseDigit, encoding="utf-8"):
         word_list[-1] = str(result)
     return ''.join(word_list)
 
+def decalageDuTemp(base, number, unit_str):
+    '''
+    得到与基础时间节点相差给定时间差距的时间节点
+
+    Args:
+        base(datetime.dateime) :- 基础时间节点
+        number(int) :- 时间单位的数量
+        unit_str(str) :- 表示时间单位的字符,
+                        choices = {
+                            'month', 'week', 'day'
+                        }
+    '''
+    if unit_str in ['month'] :
+        base = base + relativedelta(months = number)
+    elif unit_str in ['week'] :
+        base = base + datetime.timedelta(days = 7*number -base.weekday())
+    elif unit_str in ['day']:
+        base = base + datetime.timedelta(days = number )
+    else :
+        raise NameError('unit_str请在{month, week, day}中选')
+    return base
+
 def inheritHighOrderTime(previous_time, level_int, date_dict):
     '''
     继承上次时间节点的高阶时间
@@ -114,29 +136,31 @@ def get_period(string_ori):
     now = datetime.datetime.now()
     start = now
 
-    while match is not None:
-        print('\n新的一轮:')
-        # print('  pattern所在的字段 : ',string)
+    periods= []
 
+    while match is not None:
+        # print('\n新的一轮:')
+        datum = dict()
         root = match.group('root')
         ordinal_root = match.group('ordinal_root')
         unit_root = match.group('unit_root')
-        # print('unit_root : ', unit_root  )
+
         pos_affix_ori = match.group('pos_affix')
         unit_affix = match.group('unit_affix')
         number_affix_ori = match.group('number_affix')
         number_special = match.group("number_special")
         [number_unit_root, unit_unit_root] = UNIT_DICT[unit_root] if unit_root else [0, '']
-        # print('number_unit_root : ', number_unit_root)
-        # print('unit_unit_root : ', unit_unit_root)
+
         count_da  = ordinal_root.count('大') if ordinal_root else 0
         count_shang = ordinal_root.count('上') if ordinal_root else 0
         count_xia = ordinal_root.count('下') if ordinal_root else 0
-
+        
         if unit_affix in ["星期","礼拜","周"] and number_special is not None :
-            print('  pattern匹配到的字段 : ', colored(match.group(), 'green'))
+            datum["字段"] = match.group()
+            # print('  pattern匹配到的字段 : ', colored(match.group(), 'green'))
         else :
-            print('  pattern匹配到的字段 : ', colored(re.search(pattern = PATTERN2, string = string).group(), 'green'))
+            datum["字段"] = re.search(pattern = PATTERN2, string = string).group()
+            # print('  pattern匹配到的字段 : ', colored(re.search(pattern = PATTERN2, string = string).group(), 'green'))
 
         ### 是否继承时间 ###
         ############ start
@@ -145,7 +169,7 @@ def get_period(string_ori):
             break
         # 离得太远则不继承
         if start_index > 10 :
-            print("离得太远,不继承了")
+            # print("离得太远,不继承了")
             date_dict = {
                 'year' :  now.year,
                 'month' : now.month,
@@ -218,8 +242,8 @@ def get_period(string_ori):
                 elif count_xia > 0 :
                     start = datetime.datetime(year = year, month = 7, day = 1)
                     end = datetime.datetime(year = year, month = 12, day = 31)
-                else :
-                    print('半年级别没匹配到')
+                # else :
+                #     print('半年级别没匹配到')
             # 月
             elif unit_unit_root == 'month':
                 if match_digit is not None :
@@ -234,8 +258,8 @@ def get_period(string_ori):
                     month = month + count_xia
                     start = datetime.datetime(year = year, month = month, day = 1)
                     end = datetime.datetime(year = year, month = month+1, day = 1) - datetime.timedelta(days = 1)
-                else :
-                    print('月级别没匹配到')
+                # else :
+                #     print('月级别没匹配到')
             # 周
             elif unit_unit_root == 'week' :
                 day = day - weekday
@@ -245,8 +269,8 @@ def get_period(string_ori):
                 elif count_xia > 0 :
                     start = now + datetime.timedelta(days = -weekday + count_xia*7)
                     end = start + datetime.timedelta(days = 6)     
-                else :
-                    print('周级别没匹配到')
+                # else :
+                #     print('周级别没匹配到')
             # print('  root字段 : ',colored(root, 'yellow'))    
             # print('  root开始的日子 : ', colored(start.date(), 'yellow'))
             # print('  root结束的日子 : ', colored(end.date(), 'yellow')  ) 
@@ -276,17 +300,12 @@ def get_period(string_ori):
                 start = datetime.datetime(year = date_dict["year"], month = date_dict['month'], day = date_dict['day']  )
                 # print("affix继承到的时间为", start)
 
-
         level_affix = LEVEL_DICT[unit_unit_affix]
 
         # 没有表示相对位置的词则默认为第
         # 比如今年三月,表示今年第三月
         pos_affix = POS_AFFIX_DICT[pos_affix_ori] if pos_affix_ori else 'ordinal'
 
-        # print('number_affix_ori : ', number_affix_ori)
-        # print('pos_affix_ori : ',pos_affix_ori)
-        # print('number_unit_affix : ', number_unit_affix)
-        # print('unit_unit_affix : ', unit_unit_affix)
 
         '''affix只匹配到一个时间单位或者时间单位+数字
 
@@ -297,18 +316,21 @@ def get_period(string_ori):
         2.没有意义的时间如年
         '''
         if number_affix_ori is None and pos_affix_ori is None :
-            print("只匹配到一个时间单位或者时间单位+数字")
-            if unit_affix in ["星期","礼拜","周"] and number_special is not None and date_dict['level2inherit'] ==-2:
+            # print("只匹配到一个时间单位或者时间单位+数字")
+            # print("unit_affix : {}   number_special : {}  level2inhe : {}".format(
+            #     unit_affix, number_special, date_dict["level2inherit"]
+            # ))
+            if unit_affix in ["星期","礼拜","周"] and number_special is not None and date_dict['level2inherit'] <=-2:
                 # print("匹配到周几")
-                start = decalageDuTemp(start, int(number_special) - start.weekday(), 'day' )
+                # print(start)
+                start = decalageDuTemp(start, int(number_special) - start.weekday() -1 , 'day' )
                 end = start
             else :
                 string = re.sub(unit_affix, unit_unit_affix, string ,1)
-                print("没有意义的匹配\n  用{}取代{}\n".format(
-                    unit_unit_affix, unit_affix 
-                ))
+                # print("没有意义的匹配\n  用{}取代{}\n".format(
+                #     unit_unit_affix, unit_affix 
+                # ))
                 match = re.search(pattern = PATTERN, string = string)
-                print('  剩下的字段 : ',string)
                 continue 
 
         elif pos_affix in ['first']:
@@ -320,15 +342,14 @@ def get_period(string_ori):
         else :
             inheritHighOrderTime(start, level_int = level_affix, date_dict = date_dict)
 
-            if date_dict.get('level2inherit', 0) == 0:
+            if date_dict.get('level2inherit', 0) == 0: # 上次时间是年
                 start = datetime.datetime(start.year, 1, 1)
                 end = end
-            elif date_dict['level2inherit'] == -1: 
+            elif date_dict['level2inherit'] == -1: # 上次时间是月
                 start = datetime.datetime(start.year, start.month, 1)
-            elif date_dict['level2inherit'] == -2 :
+            elif date_dict['level2inherit'] == -2 : # 上次时间是周
                 start = decalageDuTemp(start, 0 ,'week')
-                # elif unit_unit_affix == 'day' :
-                #     start = decalageDuTemp(start, 1 - start.day   , unit_unit_affix)
+
             start = decalageDuTemp(start, (number_affix-1) * number_unit_affix, unit_unit_affix )
             end = decalageDuTemp(start, number_unit_affix, unit_unit_affix ) - datetime.timedelta(days = 1)
         
@@ -342,36 +363,15 @@ def get_period(string_ori):
                 end_index = i.end(0)
                 break
         string = string.lstrip( string[:end_index])
-        print('这轮匹配到的时间段 :')
-        print('  start : ', colored(start.date(), 'red'))
-        print('  end : ', colored(end.date(), 'red'))
-        # print('  这轮的level_root和level_affix : {}和{}'.format(level_root, level_affix) )
+
+        datum["开始日期"], datum["结束日期"] = start.date(), end.date()
         match = re.search(pattern = PATTERN, string = string)
-        print('  剩下的字段 : ',string)
+
         date_dict['level2inherit'] = level_affix
         date_dict['year'] = start.year 
         date_dict['month'] = start.month
         date_dict['day'] = start.day
-        # print(date_dict)
+        
+        periods.append(datum)
+    return periods
 
-def decalageDuTemp(base, number, unit_str):
-    '''
-    得到与基础时间节点相差给定时间差距的时间节点
-
-    Args:
-        base(datetime.dateime) :- 基础时间节点
-        number(int) :- 时间单位的数量
-        unit_str(str) :- 表示时间单位的字符,
-                        choices = {
-                            'month', 'week', 'day'
-                        }
-    '''
-    if unit_str in ['month'] :
-        base = base + relativedelta(months = number)
-    elif unit_str in ['week'] :
-        base = base + datetime.timedelta(days = 7*number -base.weekday())
-    elif unit_str in ['day']:
-        base = base + datetime.timedelta(days = number )
-    else :
-        raise NameError('unit_str请在{month, week, day}中选')
-    return base
