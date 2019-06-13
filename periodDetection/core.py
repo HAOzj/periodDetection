@@ -22,13 +22,13 @@ from periodDetection.patterns import (
 from .LunarSolarConverter_module import LunarSolarConverter, Solar, Lunar
 
 def t2s(sentence):
-    ''' 
+    """ 
     将sentence中的繁体字转为简体字 
     :param 
         sentence: 待转换的句子 
     :return: 
         将句子中繁体字转换为简体字之后的句子 
-    '''
+    """
     sentence = Converter('zh-hans').convert(sentence)
     return sentence
 
@@ -77,7 +77,7 @@ def chineseDigits2arabicWithin10000(chineseDigit, encoding="utf-8"):
     return ''.join(word_list)
 
 def decalageDuTemp(base, number, unit_str):
-    '''
+    """
     得到与基础时间节点相差给定时间差距的时间节点
 
     Args:
@@ -87,7 +87,7 @@ def decalageDuTemp(base, number, unit_str):
                         choices = {
                             'month', 'week', 'day'
                         }
-    '''
+    """
     if unit_str in ['month'] :
         base = base + relativedelta(months = number)
     elif unit_str in ['week'] :
@@ -99,7 +99,7 @@ def decalageDuTemp(base, number, unit_str):
     return base
 
 def inheritHighOrderTime(previous_time, level_int, date_dict):
-    '''
+    """
     继承上次时间节点的高阶时间
     比如本次时间最高单位为日,则继承上次的年和月
 
@@ -109,7 +109,7 @@ def inheritHighOrderTime(previous_time, level_int, date_dict):
         date_dict(dict) :- 记录日期的字典
     Returns:
         commands(iterables) :- 要执行的语句
-    '''
+    """
     date_dict = {}
     LEVEL_DICT_INVERSE = {
         "0" : "date_dict['year']  = {}".format(previous_time.year),
@@ -120,12 +120,12 @@ def inheritHighOrderTime(previous_time, level_int, date_dict):
         exec( LEVEL_DICT_INVERSE[str(i)])
 
 def get_period(string_ori):
-    '''
+    """
     用递归的方式来检测中文文本中包含的时间段
 
     Args:
         string_ori(str) :- 可能包含时间段的中文文本
-    '''
+    """
     string = chineseDigits2arabicWithin10000(string_ori)
     print("原始句为 : {}\n转化中文数字后的句子为 : {}\n".format(
         string_ori, string
@@ -307,14 +307,14 @@ def get_period(string_ori):
         pos_affix = POS_AFFIX_DICT[pos_affix_ori] if pos_affix_ori else 'ordinal'
 
 
-        '''affix只匹配到一个时间单位或者时间单位+数字
+        """affix只匹配到一个时间单位或者时间单位+数字
 
         如果是(周|星期|礼拜)\d,且上次时间单位为周,则匹配
 
         否则用英文单词来代替时间单位,继续匹配.避免
         1.因为把时间单位词理解成第1个单位,比如因为缺省把"周"理解为第一周.
         2.没有意义的时间如年
-        '''
+        """
         if number_affix_ori is None and pos_affix_ori is None :
             # print("只匹配到一个时间单位或者时间单位+数字")
             # print("unit_affix : {}   number_special : {}  level2inhe : {}".format(
