@@ -362,7 +362,7 @@ def get_period(string_ori):
             for i in re.finditer(pattern=PATTERN, string=string):
                 end_index = i.end(0)
                 break
-        else :
+        else:
             for i in re.finditer(pattern=PATTERN2, string=string):
                 end_index = i.end(0)
                 break
